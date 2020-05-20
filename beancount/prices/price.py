@@ -3,6 +3,9 @@
 __copyright__ = "Copyright (C) 2015-2017  Martin Blais"
 __license__ = "GNU GPLv2"
 
+# 2020-05-20 [Stefan Mach]:
+# - Add support for multiple dates
+
 import datetime
 import functools
 from os import path
@@ -264,7 +267,7 @@ def process_args():
     parser.add_argument('-v', '--verbose', action='count', help=(
         "Print out progress log. Specify twice for debugging info."))
 
-    parser.add_argument('-d', '--date', action='store',
+    parser.add_argument('-d', '--date', action='append',
                         type=date_utils.parse_date_liberally, help=(
         "Specify the date for which to fetch the prices."))
 
@@ -321,11 +324,17 @@ def process_args():
     # Setup for processing.
     setup_cache(args.cache_filename, args.clear_cache)
 
+    dates = []
+    if args.date:
+        dates.extend(d for d in args.date if d not in dates)
+        dates.sort()
+
     # Get the list of DatedPrice jobs to get from the arguments.
-    logging.info("Processing at date: %s", args.date or datetime.date.today())
+    logging.info("Processing at dates: %s", ', '.join(str(d) for d in dates) if dates else datetime.date.today())
     jobs = []
     all_entries = []
     dcontext = None
+    dates = dates or [dates] # Makes a list containing one 'None' if needed so code further down is regular
     if args.expressions:
         # Interpret the arguments as price sources.
         for source_str in args.sources:
@@ -338,9 +347,10 @@ def process_args():
                        'Supported format is "CCY:module/SYMBOL"')
                 parser.error(msg.format(source_str))
             else:
-                for currency, psources in psource_map.items():
-                    jobs.append(find_prices.DatedPrice(
-                        psources[0].symbol, currency, args.date, psources))
+                for date in dates:
+                    for currency, psources in psource_map.items():
+                        jobs.append(find_prices.DatedPrice(
+                            psources[0].symbol, currency, date, psources))
     else:
         # Interpret the arguments as Beancount input filenames.
         for filename in args.sources:
@@ -352,9 +362,10 @@ def process_args():
             entries, errors, options_map = loader.load_file(filename, log_errors=sys.stderr)
             if dcontext is None:
                 dcontext = options_map['dcontext']
-            jobs.extend(
-                find_prices.get_price_jobs_at_date(
-                    entries, args.date, args.inactive, args.undeclared))
+            for date in dates:
+                jobs.extend(
+                    find_prices.get_price_jobs_at_date(
+                        entries, date, args.inactive, args.undeclared))
             all_entries.extend(entries)
 
     return args, jobs, data.sorted(all_entries), dcontext
@@ -374,9 +385,13 @@ def main():
     price_entries = filter(None, executor.map(
         functools.partial(fetch_price, swap_inverted=args.swap_inverted), jobs))
 
+    # In case of multiple dates we sort by date, otherwise:
     # Sort them by currency, regardless of date (the dates should be close
     # anyhow, and we tend to put them in chunks in the input files anyhow).
-    price_entries = sorted(price_entries, key=lambda e: e.currency)
+    if args.date and len(args.date) > 1:
+        price_entries = sorted(price_entries, key=lambda e: e.date)
+    else:
+        price_entries = sorted(price_entries, key=lambda e: e.currency)
 
     # Avoid clobber, remove redundant entries.
     if not args.clobber:

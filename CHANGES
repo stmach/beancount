@@ -3,6 +3,11 @@
 ========================
 Note: This file contains a list changes in the 'default' branch.
 
+2020-05-20
+
+- [stmach] Add new features to the price fetcher:
+  * Support for multiple dates when fetching prices
+
 
 2020-05-17
 
