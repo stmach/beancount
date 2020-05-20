@@ -5,6 +5,7 @@ __license__ = "GNU GPLv2"
 
 # 2020-05-20 [Stefan Mach]:
 # - Add support for multiple dates
+# - Also filter newly added price entries for redundancy
 
 import datetime
 import functools
@@ -227,21 +228,27 @@ def filter_redundant_prices(price_entries, existing_entries, diffs=False):
     existing_prices = {(entry.date, entry.currency): entry
                        for entry in existing_entries
                        if isinstance(entry, data.Price)}
+    filtered_entries = []
     filtered_prices = []
+    ignored_entries = []
     ignored_prices = []
     for entry in price_entries:
         key = (entry.date, entry.currency)
-        if key in existing_prices:
+        if key in [*existing_prices, *filtered_prices]:
             if diffs:
                 existing_entry = existing_prices[key]
                 if existing_entry.amount == entry.amount:
-                    output = ignored_prices
+                    output = ignored_entries
+                    output_prices = ignored_prices
             else:
-                output = ignored_prices
+                output = ignored_entries
+                output_prices = ignored_prices
         else:
-            output = filtered_prices
+            output = filtered_entries
+            output_prices = filtered_prices
         output.append(entry)
-    return filtered_prices, ignored_prices
+        output_prices.append(key)
+    return filtered_entries, ignored_entries
 
 
 def process_args():
