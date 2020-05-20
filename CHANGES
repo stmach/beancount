@@ -8,6 +8,7 @@ Note: This file contains a list changes in the 'default' branch.
 - [stmach] Add new features to the price fetcher:
   * Support for multiple dates when fetching prices
   * Newly fetched prices are now also filtered for redundant entries
+  * Support for fetching prices for all days in a date range
 
 
 2020-05-17

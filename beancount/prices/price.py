@@ -6,6 +6,7 @@ __license__ = "GNU GPLv2"
 # 2020-05-20 [Stefan Mach]:
 # - Add support for multiple dates
 # - Also filter newly added price entries for redundancy
+# - Add support for a range of dates
 
 import datetime
 import functools
@@ -278,6 +279,14 @@ def process_args():
                         type=date_utils.parse_date_liberally, help=(
         "Specify the date for which to fetch the prices."))
 
+    parser.add_argument('-f', '--from', action='store', dest='From',
+                        type=date_utils.parse_date_liberally, help=(
+        "Specify the starting date for fetching prices in bulk."))
+
+    parser.add_argument('-t', '--to', action='store',
+                        type=date_utils.parse_date_liberally, default=datetime.datetime.now().date(),help=(
+        "Specify the stopping date [exclusive] for fetching prices in bulk. Default: today"))
+
     parser.add_argument('-i', '--inactive', action='store_true', help=(
         "Select all commodities from input files, not just the ones active on the date"))
 
@@ -332,6 +341,12 @@ def process_args():
     setup_cache(args.cache_filename, args.clear_cache)
 
     dates = []
+    if args.From:
+        logging.info("Range operation from %s to %s", args.From, args.to)
+        days = (args.to - args.From).days
+        if days <= 0:
+            parser.error("FROM must be a date before TO")
+        dates = [args.From + datetime.timedelta(days=i) for i in range(0, days)]
     if args.date:
         dates.extend(d for d in args.date if d not in dates)
         dates.sort()
